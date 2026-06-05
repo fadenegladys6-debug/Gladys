@@ -1,41 +1,17 @@
-# ──────────────────────────────────────────────────────────────
-# DGI Cameroun — Détection de fraude fiscale (Commerce extérieur)
-# ──────────────────────────────────────────────────────────────
-
-# Interface web
 streamlit
-
-# Manipulation des données
 pandas
 numpy
-openpyxl          # lecture/écriture fichiers Excel
-
-# Machine Learning
+openpyxl
 scikit-learn
 xgboost
-imbalanced-learn  # SMOTE pour le déséquilibre des classes
-
-# Interprétabilité
+imbalanced-learn
 shap
-
-# Visualisations
 matplotlib
 seaborn
-plotly            # graphiques interactifs dans Streamlit
-
-# Génération de rapports
-fpdf2              # export PDF
-xlsxwriter         # export Excel avec mise en forme
-
-# Sérialisation des modèles
+plotly
+fpdf2
+xlsxwriter
 joblib
-
-# Utilitaires
 scipy
-
-matplotlib.pyplot
-
-
-pillow         # pour la gestion des images (logo)
-openpyxl        # pour exporter en Excel
+pillow
 
