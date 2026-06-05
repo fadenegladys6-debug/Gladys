@@ -1,3 +1,4 @@
+matplolib.pyplot
 streamlit
 matplotlib
 pandas
