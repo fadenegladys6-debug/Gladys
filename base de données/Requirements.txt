@@ -1,22 +1,43 @@
-# Core data manipulation
-pandas>=1.5.0
-numpy>=1.23.0
+# ──────────────────────────────────────────────────────────────
+# DGI Cameroun — Détection de fraude fiscale (Commerce extérieur)
+# ──────────────────────────────────────────────────────────────
+
+# Interface web
+streamlit==1.35.0
+
+# Manipulation des données
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.3          # lecture/écriture fichiers Excel
+
+# Machine Learning
+scikit-learn==1.5.0
+xgboost==2.0.3
+imbalanced-learn==0.12.3  # SMOTE pour le déséquilibre des classes
+
+# Interprétabilité
+shap==0.45.1
+
+# Visualisations
+matplotlib==3.9.0
+seaborn==0.13.2
+plotly==5.22.0            # graphiques interactifs dans Streamlit
+
+# Génération de rapports
+fpdf2==2.7.9              # export PDF
+xlsxwriter==3.2.0         # export Excel avec mise en forme
+
+# Sérialisation des modèles
+joblib==1.4.2
+
+# Utilitaires
+scipy==1.13.1
+
 matplotlib.pyplot
 # Machine learning
-scikit-learn>=1.2.0
 imbalanced-learn>=0.10.0
 joblib>=1.2.0
 
-# Visualization
-matplotlib>=3.6.0
-seaborn>=0.12.0
-
-# Streamlit app
-streamlit>=1.28.0
 pillow>=9.0.0          # pour la gestion des images (logo)
 openpyxl>=3.1.0        # pour exporter en Excel
-fpdf>=1.7.2            # pour générer des rapports PDF
-
-# (Optionnel, si vous réutilisez du code qui en dépend)
-# xgboost>=1.7.0
-# shap>=0.41.0
+libgomp1
