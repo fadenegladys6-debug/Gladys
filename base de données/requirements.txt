@@ -3,41 +3,39 @@
 # ──────────────────────────────────────────────────────────────
 
 # Interface web
-streamlit==1.35.0
+streamlit
 
 # Manipulation des données
-pandas==2.2.2
-numpy==1.26.4
-openpyxl==3.1.3          # lecture/écriture fichiers Excel
+pandas
+numpy
+openpyxl          # lecture/écriture fichiers Excel
 
 # Machine Learning
-scikit-learn==1.5.0
-xgboost==2.0.3
-imbalanced-learn==0.12.3  # SMOTE pour le déséquilibre des classes
+scikit-learn
+xgboost
+imbalanced-learn  # SMOTE pour le déséquilibre des classes
 
 # Interprétabilité
-shap==0.45.1
+shap
 
 # Visualisations
-matplotlib==3.9.0
-seaborn==0.13.2
-plotly==5.22.0            # graphiques interactifs dans Streamlit
+matplotlib
+seaborn
+plotly            # graphiques interactifs dans Streamlit
 
 # Génération de rapports
-fpdf2==2.7.9              # export PDF
-xlsxwriter==3.2.0         # export Excel avec mise en forme
+fpdf2              # export PDF
+xlsxwriter         # export Excel avec mise en forme
 
 # Sérialisation des modèles
-joblib==1.4.2
+joblib
 
 # Utilitaires
-scipy==1.13.1
+scipy
 
 matplotlib.pyplot
-# Machine learning
-imbalanced-learn>=0.10.0
-joblib>=1.2.0
 
-pillow>=9.0.0          # pour la gestion des images (logo)
-openpyxl>=3.1.0        # pour exporter en Excel
-libgomp1
+
+pillow         # pour la gestion des images (logo)
+openpyxl        # pour exporter en Excel
+
