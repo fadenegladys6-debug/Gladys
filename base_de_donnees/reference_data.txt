@@ -1,0 +1,4 @@
+import pandas as pd
+df = pd.read_csv('datafraud_cleaned.csv')
+df_sample = df.sample(500)  # ou tout votre jeu
+df_sample.to_csv('app/data/reference_data.csv', index=False)

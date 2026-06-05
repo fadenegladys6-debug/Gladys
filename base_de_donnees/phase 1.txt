@@ -1,0 +1,12 @@
+Train: (4140, 13), Test: (1035, 13)
+AUC-ROC moyen (CV) : nan (+/- nan)
+---------------------------------------------------------------------------
+IndexError                                Traceback (most recent call last)
+Cell In[2], line 67
+     65 pipeline.fit(X_train, y_train)
+     66 y_pred = pipeline.predict(X_test)
+---> 67 y_proba = pipeline.predict_proba(X_test)[:, 1]
+     69 print("\n=== RAPPORT DE CLASSIFICATION ===")
+     70 print(classification_report(y_test, y_pred))
+
+IndexError: index 1 is out of bounds for axis 1 with size 1

@@ -1,0 +1,32 @@
+Régime 
+RSI : régime simplifié
+HRI : hors régime d'imposition
+IL : impot libératoire
+OBNL : organisation à but non lucratif
+
+Profil
+C : connu
+PC : pas connu
+
+Type de centre de rattachement
+
+CDI:centre divisionnaire des impots
+CSI :centre spécialisé des impots 
+CIME: centre des moyennes entreprises
+DGE:direction des grandes entreprises
+
+CRI: centre régional des impots 
+CRIA : Adamaoua
+CRIC1 : centre 1
+CRIC2 : centre 2
+CRICExt : centre exterieur (zone hors du département du mfoundi)
+CRIL1 :littoral 1
+CRIL2 : littoral 2
+CRILExt : littoral extérieur 
+CRIO : ouest 
+CRIN : nord
+CRIEN : extreme nord
+CRINO : nord ouest
+CRISO : sud ouest
+
+DSF: déclaration statistique fiscal
