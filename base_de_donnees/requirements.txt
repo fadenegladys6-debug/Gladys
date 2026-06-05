@@ -12,4 +12,4 @@ xlsxwriter
 joblib==1.4.2
 scipy
 pillow==10.4.0
-imbalanced-learn==0.12.3
+
