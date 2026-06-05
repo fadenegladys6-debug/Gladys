@@ -1,7 +1,22 @@
-matplolib.pyplot
-streamlit
-matplotlib
-pandas
-numpy
-seaborn
+# Core data manipulation
+pandas>=1.5.0
+numpy>=1.23.0
 
+# Machine learning
+scikit-learn>=1.2.0
+imbalanced-learn>=0.10.0
+joblib>=1.2.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Streamlit app
+streamlit>=1.28.0
+pillow>=9.0.0          # pour la gestion des images (logo)
+openpyxl>=3.1.0        # pour exporter en Excel
+fpdf>=1.7.2            # pour générer des rapports PDF
+
+# (Optionnel, si vous réutilisez du code qui en dépend)
+# xgboost>=1.7.0
+# shap>=0.41.0
