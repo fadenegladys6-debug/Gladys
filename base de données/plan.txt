@@ -1,0 +1,349 @@
+# Plan détaillé de méthodologie pour la segmentation des contribuables à risque de fraude fiscale dans le commerce extérieur
+
+## Contexte et objectif
+En tant que stagiaire à la DGI Cameroun, vous devez concevoir une application interactive (Streamlit) capable de classifier les contribuables selon leur niveau de risque de fraude fiscale dans le commerce extérieur, à partir de la base de données fournie.
+
+---
+
+## 1. Compréhension et préparation des données
+
+### 1.1 Analyse descriptive de la base
+| Étape | Actions |
+|-------|---------|
+| **Structure** | Identifier les types de variables (numériques, catégorielles, dates) |
+| **Dimensions** | 112 colonnes, environ 4400+ lignes |
+| **Valeurs manquantes** | Cartographier les colonnes avec des vides (ex: certaines colonnes "Elasticité..." vides) |
+| **Doublons** | Vérifier l'unicité des `Identifiant correspondant NIU` |
+
+### 1.2 Nettoyage des données
+```python
+# Actions prioritaires
+- Remplacer les valeurs "Constante", "Croissante", "Décroissante" dans les colonnes de variation
+- Convertir les nombres stockés comme texte (ex: "55427423" → int)
+- Gérer les valeurs aberrantes évidentes (montants négatifs, zéros inexpliqués)
+- Standardiser les formats de dates
+- Traiter les colonnes avec des valeurs mixtes (numeriques + texte)
+```
+
+### 1.3 Définition de la variable cible (fraude)
+D'après les données, plusieurs indicateurs de fraude existent :
+
+| Colonne candidate | Signification | Utilisation recommandée |
+|-------------------|---------------|-------------------------|
+| `Dissimulation du Chiffre d'Affaires` (années 2022/2023) | Oui/Non | **Variable primaire** |
+| `Probleme de déclaration du Chiffre d'Affaires` | Oui/Non | Variable secondaire |
+| `risque de fraude final` | "fraude faible/moyenne/élevée/constant" | Variable tertiaire |
+| `Comportement d'anomalie avec l'administration fiscale...` | Oui/Non | Variable de confirmation |
+
+**Recommandation :** Créer une variable binaire `FRAUDE` = 1 si au moins 2 indicateurs sont positifs, ou utiliser le `risque de fraude final` comme cible ordinale.
+
+---
+
+## 2. Ingénierie des caractéristiques (Feature Engineering)
+
+### 2.1 Variables catégorielles à encoder
+| Variable | Encodage suggéré |
+|----------|------------------|
+| `Personnalité juridique` (Personne morale/physique) | One-hot ou label |
+| `Régime 2022/2023` (RSI/HRI/IL/OBNL/REEL/SALARIE) | Target encoding ou one-hot |
+| `Profil` (C/PC) | Binaire |
+| `Type de centre de rattachement` | One-hot |
+| `CRI` (code région) | Target encoding ou one-hot |
+
+### 2.2 Variables numériques transformées
+```python
+# Créer des ratios pertinents
+- Taux d'export = CA Export / CA total
+- Taux d'import = Valeur import / CA total  
+- Ratio dissimulation = (CA déclaré douane - CA déclaré fiscal) / CA fiscal
+- Évolution CA = (CA2023 - CA2022) / CA2022
+- Évolution export = (Export2023 - Export2022) / Export2022
+```
+
+### 2.3 Variables composites (interactions)
+| Interaction | Justification |
+|-------------|----------------|
+| Régime × CA | Certains régimes sont plus risqués pour certains niveaux de CA |
+| CRI × CA export | Les régions frontalières (Extrême-Nord, Est) peuvent avoir plus de fraude |
+| Type centre × Profil | Les "non connus" dans DGE/CIME vs CDI |
+| Elasticité export × Variation CA | Incohérence entre CA et exportations |
+
+---
+
+## 3. Analyse exploratoire (EDA) pour la segmentation
+
+### 3.1 Analyses univariées
+| Type | Variables ciblées |
+|------|-------------------|
+| Distribution | CA, export, import (attention aux fortes asymétries) |
+| Fréquences | Régime, CRI, Profil, centre de rattachement |
+| Taux de fraude par catégorie | Régime, CRI, personnalité juridique |
+
+### 3.2 Analyses bivariées
+```python
+# Tableaux croisés
+pd.crosstab(df['Régime 2023'], df['FRAUDE'], normalize='index')
+pd.crosstab(df['CRI'], df['Dissimulation du Chiffre d\'Affaires 2023'])
+
+# Tests statistiques
+- Chi2 pour les relations catégorielles
+- ANOVA ou Kruskal-Wallis pour CA vs fraude
+- Corrélation de Spearman pour variables ordinales
+```
+
+### 3.3 Visualisations clés pour le rapport
+- **Heatmap** des corrélations entre indicateurs de fraude
+- **Boxplots** de CA par niveau de risque de fraude
+- **Barres empilées** des types de dissimulation par région
+- **Scatter plot** CA export vs CA déclaré, coloré par fraude
+- **Treemap** du volume de fraude par CRI
+
+---
+
+## 4. Modélisation pour la segmentation
+
+### 4.1 Stratégie : Classification supervisée + Clustering
+
+#### Phase 1 - Classification (prédiction de la fraude)
+| Modèle | Avantages pour ce contexte |
+|--------|---------------------------|
+| **Random Forest** | Gère bien les non-linéarités, importance des variables, robuste aux outliers |
+| **XGBoost** | Performance élevée, gère les déséquilibres |
+| **Régression logistique** | Interprétabilité (important pour la DGI) |
+
+**Approche finale proposée :** Ensemble (Random Forest + XGBoost) avec interprétation via SHAP.
+
+#### Phase 2 - Segmentation non supervisée (clustering)
+Pour identifier des "profils types" de fraudeurs :
+```python
+# Après PCA sur les features pertinentes
+from sklearn.cluster import KMeans
+kmeans = KMeans(n_clusters=4)  # (fraudeurs avérés, potentiels, à risque, sains)
+```
+
+### 4.2 Gestion du déséquilibre des classes
+| Technique | Application |
+|-----------|-------------|
+| SMOTE | Sur-échantillonnage des fraudeurs |
+| Class_weight | Paramètre 'balanced' dans les modèles |
+| Métriques adaptées | Précision, Rappel, F1-score, AUC-ROC (pas accuracy simple) |
+
+### 4.3 Features finales retenues (suggestion)
+```python
+features = [
+    # Identifiants
+    'Personnalité juridique',
+    'Régime 2023', 
+    'Profil en 2023',
+    'Type de centre de rattachement 2023',
+    'CRI 2023',
+    
+    # Montants (log-transformés)
+    'log_CA_DSF_2023',
+    'log_CA_Export_DSF_2023',
+    'log_Valeur_export_2023',
+    'log_Valeur_import_2023',
+    
+    # Ratios
+    'ratio_export_CA',
+    'ratio_import_CA',
+    'ecart_export_CA',
+    
+    # Évolutions
+    'variation_CA_23_22',
+    'variation_export_23_22',
+    
+    # Scores existants
+    'score_du_risque_fichier_en_2023',
+    'Score_de_déviance_à_la_déclaration_fiscale_en_2023',
+    'Score_du_risque_du_chiffre_d_affaire_en_2023'
+]
+```
+
+---
+
+## 5. Architecture de l'application Streamlit
+
+### 5.1 Structure de l'application
+```
+app/
+├── app.py                 # Point d'entrée Streamlit
+├── pages/
+│   ├── 1_Prediction.py    # Prédiction individuelle
+│   ├── 2_Analyse_lot.py   # Analyse par lot (upload CSV)
+│   ├── 3_Dashboard.py     # Tableaux de bord de suivi
+│   └── 4_Export.py        # Génération de rapports
+├── models/
+│   ├── fraud_model.pkl     # Modèle entraîné
+│   ├── scaler.pkl          # Normalisation
+│   └── feature_names.pkl
+├── utils/
+│   ├── preprocessing.py    # Nettoyage des inputs
+│   ├── visualization.py    # Graphiques
+│   └── report_generator.py # PDF/Excel
+└── data/
+    └── reference_data.csv  # Données de référence
+```
+
+### 5.2 Fonctionnalités de l'interface
+
+#### Page 1 : Prédiction individuelle
+```python
+# Inputs utilisateur
+- NIU (autocomplétion ou saisie manuelle)
+- OU formulaire avec tous les champs clés
+- Upload d'une ligne CSV
+
+# Outputs
+- Niveau de risque (Faible/Moyen/Élevé/Critique)
+- Probabilité de fraude (0-100%)
+- Facteurs de risque identifiés (top 3 features)
+- Comparaison avec profil similaire
+- Bouton "Générer rapport PDF"
+```
+
+#### Page 2 : Analyse par lot
+- Upload de fichier CSV (plusieurs contribuables)
+- Traitement en lots avec barre de progression
+- Export des résultats (Excel avec colorisation)
+- Distribution des niveaux de risque
+
+#### Page 3 : Dashboard analytique
+```python
+# Indicateurs clés
+- Taux global de fraude détectée
+- Top 10 CRI à risque
+- Distribution par régime d'imposition
+- Évolution temporelle (si données historiques)
+- Alertes : contribuables avec forte variation de comportement
+```
+
+#### Page 4 : Gestion du modèle
+- Métriques de performance (accuracy, recall, F1)
+- Matrice de confusion
+- Feature importance (graphique à barres)
+- Date du dernier entraînement
+
+### 5.3 Exemple de code pour la prédiction
+```python
+import streamlit as st
+import pandas as pd
+import joblib
+
+@st.cache_resource
+def load_model():
+    return joblib.load('models/fraud_model.pkl')
+
+def predict_fraud(input_data):
+    model = load_model()
+    preprocessed = preprocess_input(input_data)
+    proba = model.predict_proba(preprocessed)[0, 1]
+    risk_level = "Élevé" if proba > 0.7 else "Moyen" if proba > 0.3 else "Faible"
+    return proba, risk_level
+
+# Interface
+st.title("🔍 Détection de fraude fiscale - Commerce extérieur")
+niu = st.text_input("NIU du contribuable")
+if st.button("Analyser"):
+    with st.spinner("Analyse en cours..."):
+        proba, risk = predict_fraud(niu)
+        st.metric("Risque de fraude", f"{proba:.1%}")
+        st.markdown(f"**Niveau :** {risk}")
+```
+
+---
+
+## 6. Évaluation et validation
+
+### 6.1 Métriques de performance
+| Métrique | Cible | Justification |
+|----------|-------|---------------|
+| Précision (Precision) | > 0.70 | Minimiser les faux positifs (ne pas accuser à tort) |
+| Rappel (Recall) | > 0.80 | Maximiser la détection des vrais fraudeurs |
+| F1-score | > 0.75 | Équilibre précision/rappel |
+| AUC-ROC | > 0.85 | Pouvoir discriminatoire du modèle |
+
+### 6.2 Validation croisée
+```python
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=cv, scoring='f1')
+```
+
+### 6.3 Interprétabilité avec SHAP
+```python
+import shap
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X_test)
+shap.summary_plot(shap_values, X_test, feature_names=features)
+```
+**À intégrer dans l'app :** Afficher les facteurs qui ont le plus contribué à la décision pour chaque prédiction.
+
+---
+
+## 7. Plan de développement (calendrier estimé)
+
+| Phase | Durée | Livrables |
+|-------|-------|------------|
+| **Semaine 1** | 5j | Nettoyage des données, EDA, définition de la cible |
+| **Semaine 2** | 5j | Feature engineering, sélection des variables |
+| **Semaine 3** | 5j | Modélisation, optimisation hyperparamètres, validation |
+| **Semaine 4** | 5j | Développement application Streamlit (backend) |
+| **Semaine 5** | 5j | Interface utilisateur, tests, documentation |
+| **Semaine 6** | 5j | Rédaction rapport final, présentation, déploiement |
+
+---
+
+## 8. Livrables finaux
+
+| Livrable | Format | Description |
+|----------|--------|-------------|
+| **Application interactive** | Python/Streamlit | Application web locale ou déployée sur serveur DGI |
+| **Rapport méthodologique** | PDF | Documentation complète (30-40 pages) |
+| **Notebook d'analyse** | Jupyter | Code commenté de l'EDA et de la modélisation |
+| **Modèle entraîné** | .pkl | Fichier sérialisé du meilleur modèle |
+| **Guide utilisateur** | PDF | Notice d'utilisation de l'application |
+| **Présentation soutenance** | PowerPoint | Synthèse de 20-25 slides |
+
+---
+
+## 9. Recommandations additionnelles
+
+### 9.1 Pour améliorer la robustesse
+- **Mettre à jour périodiquement** le modèle avec les nouvelles données de contrôle
+- **Ajouter un feedback loop** : intégrer les résultats des contrôles douaniers pour réentraîner
+- **Créer des profils sectoriels** : le seuil de risque peut varier par secteur d'activité
+
+### 9.2 Pour la DGI
+- **Former les agents** à l'interprétation des résultats
+- **Intégrer l'outil** dans le workflow existant (pas un outil isolé)
+- **Prévoir un comité de validation** pour les cas à risque élevé avant contrôle
+
+### 9.3 Limitations à mentionner
+- Le modèle ne remplace pas un contrôle fiscal approfondi
+- Il existe un risque de faux positifs/négatifs
+- La qualité des prédictions dépend de la qualité des déclarations
+
+---
+
+## 10. Glossaire des variables clés pour le développement
+
+| Abréviation | Signification |
+|-------------|---------------|
+| NIU | Numéro d'Identification Unique (contribuable) |
+| RSI | Régime Simplifié d'Imposition |
+| HRI | Hors Régime d'Imposition |
+| IL | Impôt Libératoire |
+| OBNL | Organisation à But Non Lucratif |
+| C/PC | Connu / Pas Connu (profil fiscal) |
+| CDI | Centre Divisionnaire des Impôts |
+| CSI | Centre Spécialisé des Impôts |
+| CIME | Centre des Moyennes Entreprises |
+| DGE | Direction des Grandes Entreprises |
+| CRI | Centre Régional des Impôts (avec code région) |
+| DSF | Déclaration Statistique Fiscale |
+| CA | Chiffre d'Affaires |
+
+---
+
+Cette méthodologie vous permettra de construire un outil opérationnel, interprétable et utile pour la DGI Cameroun. Commencez par l'exploration approfondie des données avant tout développement !

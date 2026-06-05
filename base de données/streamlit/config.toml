@@ -1,0 +1,8 @@
+# .streamlit/config.toml
+
+[theme]
+primaryColor = "#F5A623"      # orange DGI
+backgroundColor = "#FFF3E0"   # orange très clair
+secondaryBackgroundColor = "#FFE0B2"
+textColor = "#2C3E50"
+font = "sans serif"
