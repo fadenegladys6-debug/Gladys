@@ -1,0 +1,467 @@
+Très bien ! Nous allons implémenter la structure complète pour obtenir une application professionnelle et modulaire. Voici les fichiers à créer avec leur contenu.
+
+## Structure des dossiers à créer
+
+Dans votre répertoire de travail (par exemple `C:/Users/hp/Desktop/base de données/`), créez l’arborescence suivante :
+
+```
+app/
+├── app.py
+├── pages/
+│   ├── 1_Prediction.py
+│   ├── 2_Analyse_lot.py
+│   ├── 3_Dashboard.py
+│   └── 4_Export.py
+├── models/
+│   └── fraud_model.pkl          (déjà existant)
+├── utils/
+│   ├── preprocessing.py
+│   ├── visualization.py
+│   └── report_generator.py
+└── data/
+    └── reference_data.csv       (optionnel)
+```
+
+Placez votre fichier `fraud_model.pkl` dans le dossier `models/`.
+
+---
+
+## 1. Fichier `app.py` (page d’accueil et navigation)
+
+```python
+import streamlit as st
+
+st.set_page_config(
+    page_title="Détection de fraude fiscale",
+    page_icon="🔍",
+    layout="wide"
+)
+
+st.title("🔍 Détection de fraude fiscale - Commerce extérieur")
+st.markdown(
+    """
+    Bienvenue dans l'application d'aide à la détection de fraude fiscale.
+    
+    Utilisez le menu sur la gauche pour naviguer entre les différentes fonctionnalités :
+    
+    - **Prédiction individuelle** : évaluez un contribuable à partir de ses données.
+    - **Analyse par lot** : importez un fichier CSV pour analyser plusieurs contribuables.
+    - **Tableau de bord** : visualisez les statistiques et les tendances.
+    - **Export de rapports** : générez des rapports PDF/Excel.
+    """
+)
+
+st.sidebar.success("Sélectionnez une page ci-dessus.")
+```
+
+---
+
+## 2. Fichier `pages/1_Prediction.py` (prédiction individuelle)
+
+```python
+import streamlit as st
+import pandas as pd
+import sys
+import os
+
+# Ajouter le chemin parent pour importer utils
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.preprocessing import preprocess_input
+from utils.visualization import plot_gauge
+import joblib
+
+# Chargement du modèle
+@st.cache_resource
+def load_model():
+    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "fraud_model.pkl")
+    return joblib.load(model_path)
+
+def predict_fraud(input_df):
+    model = load_model()
+    proba = model.predict_proba(input_df)[0, 1]
+    pred = model.predict(input_df)[0]
+    return proba, pred
+
+st.title("🔎 Prédiction individuelle")
+st.markdown("Saisissez les informations du contribuable pour évaluer son risque de fraude.")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("Informations générales")
+    personnalite = st.selectbox("Personnalité juridique", ["Personne morale", "Personne physique"])
+    regime = st.selectbox("Régime fiscal 2023", ["RSI", "REEL", "HRI", "IL", "OBNL", "SALARIE"])
+    profil = st.selectbox("Profil 2023", ["C", "PC"])
+    centre = st.selectbox("Type de centre de rattachement", ["CDI", "CIME", "CSI", "DGE"])
+    cri = st.selectbox("CRI (région)", ["CRIC1", "CRIC2", "CRIL1", "CRIL2", "CRIE", "CRIN", "CRINO", "CRISO", "CRIA"])
+
+with col2:
+    st.subheader("Données financières 2023")
+    ca_total = st.number_input("Chiffre d'affaires total (FCFA)", min_value=0, value=0, step=1000000)
+    ca_export = st.number_input("Chiffre d'affaires export (FCFA)", min_value=0, value=0, step=1000000)
+    val_export = st.number_input("Valeur exportée selon douane (FCFA)", min_value=0, value=0, step=1000000)
+    val_import = st.number_input("Valeur importée (FCFA)", min_value=0, value=0, step=1000000)
+    score_risque = st.number_input("Score de risque fichier (0-10)", min_value=0.0, max_value=10.0, value=0.0, step=0.1)
+    ecart = st.number_input("Écart CA export / douane (FCFA)", value=0, step=100000)
+
+# Création du DataFrame d'entrée
+input_data = preprocess_input(personnalite, regime, profil, centre, cri,
+                              ca_total, ca_export, val_export, val_import,
+                              score_risque, ecart)
+
+if st.button("Évaluer le risque", type="primary"):
+    with st.spinner("Analyse en cours..."):
+        proba, pred = predict_fraud(input_data)
+    
+    st.markdown("---")
+    st.subheader("Résultat de l'analyse")
+    
+    col_met, col_expl = st.columns([1, 2])
+    with col_met:
+        st.metric("Probabilité de fraude", f"{proba:.1%}")
+        if pred == 1:
+            st.error("⚠️ **Contribuable suspect** – Un contrôle approfondi est recommandé.")
+        else:
+            st.success("✅ **Contribuable en règle** – Aucune anomalie majeure détectée.")
+    
+    with col_expl:
+        st.markdown("**Facteurs de risque pris en compte :**")
+        st.markdown("- Écart entre CA export déclaré et valeur douane")
+        st.markdown("- Ratio export / CA total")
+        st.markdown("- Score de risque fichier")
+        st.markdown("- Type de centre de rattachement")
+        st.markdown("- Régime fiscal")
+    
+    # Jauge
+    plot_gauge(proba)
+```
+
+---
+
+## 3. Fichier `pages/2_Analyse_lot.py` (analyse par lot CSV)
+
+```python
+import streamlit as st
+import pandas as pd
+import sys
+import os
+import tempfile
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.preprocessing import preprocess_batch
+import joblib
+
+@st.cache_resource
+def load_model():
+    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "fraud_model.pkl")
+    return joblib.load(model_path)
+
+st.title("📊 Analyse par lot")
+st.markdown("Importez un fichier CSV contenant les données de plusieurs contribuables.")
+
+uploaded_file = st.file_uploader("Choisir un fichier CSV", type="csv")
+
+if uploaded_file is not None:
+    df_raw = pd.read_csv(uploaded_file)
+    st.write("Aperçu des données importées :")
+    st.dataframe(df_raw.head())
+    
+    # Vérification des colonnes requises
+    required_cols = ['Personnalite_juridique', 'Regime_2023', 'Profil_en_2023',
+                     'Type_de_centre_de_rattachement_2023', 'CRI_2023',
+                     'CA_DSF_2023', 'CA_Export_DSF_2023', 'Valeur_export_2023',
+                     'Valeur_import_2023', 'score_du_risque_fichier_en_2023', 'ECART_2023']
+    
+    missing = [c for c in required_cols if c not in df_raw.columns]
+    if missing:
+        st.error(f"Colonnes manquantes dans le fichier : {missing}")
+    else:
+        if st.button("Lancer l'analyse"):
+            with st.spinner("Analyse en cours..."):
+                # Prétraitement du batch
+                X = preprocess_batch(df_raw)
+                model = load_model()
+                probas = model.predict_proba(X)[:, 1]
+                preds = model.predict(X)
+            
+            df_raw['probabilite_fraude'] = probas
+            df_raw['prediction'] = preds
+            df_raw['niveau_risque'] = df_raw['probabilite_fraude'].apply(
+                lambda x: 'Élevé' if x > 0.7 else 'Modéré' if x > 0.3 else 'Faible'
+            )
+            
+            st.subheader("Résultats")
+            st.dataframe(df_raw[['Identifiant_correspondant_NIU', 'probabilite_fraude', 'niveau_risque', 'prediction']].head(20))
+            
+            # Téléchargement des résultats
+            csv = df_raw.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Télécharger les résultats (CSV)", csv, "resultats_analyse.csv", "text/csv")
+            
+            # Statistiques rapides
+            st.write("**Statistiques**")
+            st.write(f"Nombre de contribuables suspects : {df_raw['prediction'].sum()}")
+            st.write(f"Taux de suspicion : {df_raw['prediction'].mean():.2%}")
+```
+
+---
+
+## 4. Fichier `pages/3_Dashboard.py` (tableau de bord)
+
+```python
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.visualization import plot_risk_distribution
+
+st.title("📈 Tableau de bord")
+
+# Charger les données de référence (à adapter selon vos données)
+@st.cache_data
+def load_reference_data():
+    # Ici, vous pouvez charger un fichier de données historiques.
+    # Pour l'exemple, nous allons générer des données aléatoires (à remplacer par votre vrai fichier).
+    # Idéalement, utilisez un fichier CSV de synthèse ou les résultats de l'analyse par lot.
+    try:
+        df = pd.read_csv("data/reference_data.csv")
+    except:
+        # Création de données factices
+        np.random.seed(42)
+        n = 1000
+        df = pd.DataFrame({
+            "probabilite_fraude": np.random.beta(1, 10, n),
+            "CRI_2023": np.random.choice(["CRIC1", "CRIC2", "CRIL1", "CRIL2"], n),
+            "Regime_2023": np.random.choice(["RSI", "REEL", "HRI"], n)
+        })
+    return df
+
+df = load_reference_data()
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Taux de fraude moyen", f"{df['probabilite_fraude'].mean():.1%}")
+with col2:
+    st.metric("Nombre de suspicions (>70%)", f"{(df['probabilite_fraude'] > 0.7).sum()}")
+
+# Distribution par région
+st.subheader("Risque moyen par région (CRI)")
+risk_by_cri = df.groupby('CRI_2023')['probabilite_fraude'].mean().sort_values()
+fig, ax = plt.subplots()
+risk_by_cri.plot(kind='barh', ax=ax, color='coral')
+ax.set_xlabel("Probabilité moyenne de fraude")
+st.pyplot(fig)
+
+# Distribution par régime
+st.subheader("Risque moyen par régime fiscal")
+risk_by_regime = df.groupby('Regime_2023')['probabilite_fraude'].mean().sort_values()
+fig2, ax2 = plt.subplots()
+risk_by_regime.plot(kind='bar', ax=ax2, color='skyblue')
+ax2.set_ylabel("Probabilité moyenne")
+st.pyplot(fig2)
+
+# Histogramme des probabilités
+fig3, ax3 = plt.subplots()
+df['probabilite_fraude'].hist(bins=30, ax=ax3, alpha=0.7, color='green')
+ax3.set_xlabel("Probabilité de fraude")
+ax3.set_ylabel("Nombre de contribuables")
+st.pyplot(fig3)
+```
+
+---
+
+## 5. Fichier `pages/4_Export.py` (génération de rapports)
+
+```python
+import streamlit as st
+import pandas as pd
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.report_generator import generate_pdf_report, generate_excel_report
+
+st.title("📄 Génération de rapports")
+st.markdown("Générez un rapport personnalisé à partir des résultats d'analyse.")
+
+uploaded_file = st.file_uploader("Chargez le fichier CSV des résultats (optionnel)", type="csv")
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    st.write("Aperçu :")
+    st.dataframe(df.head())
+    
+    if st.button("Générer rapport Excel"):
+        excel_file = generate_excel_report(df)
+        with open(excel_file, "rb") as f:
+            st.download_button("📥 Télécharger rapport Excel", f, "rapport_fraude.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    
+    if st.button("Générer rapport PDF (résumé)"):
+        pdf_file = generate_pdf_report(df)
+        with open(pdf_file, "rb") as f:
+            st.download_button("📥 Télécharger rapport PDF", f, "rapport_fraude.pdf", "application/pdf")
+else:
+    st.info("Veuillez d'abord exporter des résultats via la page 'Analyse par lot'.")
+```
+
+---
+
+## 6. Fichier `utils/preprocessing.py`
+
+```python
+import pandas as pd
+import numpy as np
+
+def preprocess_input(personnalite, regime, profil, centre, cri,
+                     ca_total, ca_export, val_export, val_import,
+                     score_risque, ecart):
+    """Transforme les entrées utilisateur en DataFrame prêt pour le modèle."""
+    ratio = ca_export / (ca_total + 1)
+    data = {
+        'Personnalite_juridique': personnalite,
+        'Regime_2023': regime,
+        'Profil_en_2023': profil,
+        'Type_de_centre_de_rattachement_2023': centre,
+        'CRI_2023': cri,
+        'CA_DSF_2023': ca_total,
+        'CA_Export_DSF_2023': ca_export,
+        'Valeur_export_2023': val_export,
+        'Valeur_import_2023': val_import,
+        'score_du_risque_fichier_en_2023': score_risque,
+        'ECART_2023': ecart,
+        'ratio_export_ca': ratio
+    }
+    return pd.DataFrame([data])
+
+def preprocess_batch(df):
+    """Prétraite un DataFrame batch (mêmes colonnes que le modèle)."""
+    # Calcul du ratio export/CA
+    df['ratio_export_ca'] = df['CA_Export_DSF_2023'] / (df['CA_DSF_2023'] + 1)
+    # Sélectionner uniquement les colonnes utilisées par le modèle
+    features = ['Personnalite_juridique', 'Regime_2023', 'Profil_en_2023',
+                'Type_de_centre_de_rattachement_2023', 'CRI_2023',
+                'CA_DSF_2023', 'CA_Export_DSF_2023', 'Valeur_export_2023',
+                'Valeur_import_2023', 'score_du_risque_fichier_en_2023',
+                'ECART_2023', 'ratio_export_ca']
+    X = df[features].copy()
+    return X
+```
+
+---
+
+## 7. Fichier `utils/visualization.py`
+
+```python
+import streamlit as st
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_gauge(probability):
+    """Affiche une jauge de risque avec Matplotlib."""
+    fig, ax = plt.subplots(figsize=(6, 2))
+    # Barre horizontale
+    colors = ['green', 'orange', 'red']
+    thresholds = [0.3, 0.7]
+    # Déterminer la couleur
+    if probability < thresholds[0]:
+        color = colors[0]
+    elif probability < thresholds[1]:
+        color = colors[1]
+    else:
+        color = colors[2]
+    
+    ax.barh([0], probability, color=color, height=0.4)
+    ax.set_xlim(0, 1)
+    ax.set_yticks([])
+    ax.set_xlabel("Niveau de risque")
+    ax.axvline(x=thresholds[0], color='gray', linestyle='--', alpha=0.5)
+    ax.axvline(x=thresholds[1], color='gray', linestyle='--', alpha=0.5)
+    ax.text(probability + 0.02, 0, f"{probability:.0%}", va='center')
+    st.pyplot(fig)
+
+def plot_risk_distribution(probas):
+    """Histogramme des probabilités."""
+    fig, ax = plt.subplots()
+    ax.hist(probas, bins=30, alpha=0.7, color='steelblue')
+    ax.set_xlabel("Probabilité de fraude")
+    ax.set_ylabel("Nombre de contribuables")
+    st.pyplot(fig)
+```
+
+---
+
+## 8. Fichier `utils/report_generator.py`
+
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+from fpdf import FPDF
+import tempfile
+import os
+
+def generate_excel_report(df):
+    """Génère un fichier Excel avec mise en forme basique."""
+    output = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+    with pd.ExcelWriter(output.name, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Resultats', index=False)
+        # Optionnel : ajouter des formats
+    return output.name
+
+def generate_pdf_report(df):
+    """Génère un rapport PDF résumé."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Rapport d'analyse de risque fiscal", ln=1, align='C')
+    pdf.ln(10)
+    
+    # Statistiques
+    n_suspects = (df['prediction'] == 1).sum() if 'prediction' in df.columns else 0
+    taux_suspects = n_suspects / len(df) if len(df) > 0 else 0
+    pdf.cell(200, 10, txt=f"Nombre total de contribuables analysés : {len(df)}", ln=1)
+    pdf.cell(200, 10, txt=f"Nombre de suspects : {n_suspects} ({taux_suspects:.2%})", ln=1)
+    
+    # Ajout d'un graphique simple (optionnel)
+    if 'probabilite_fraude' in df.columns:
+        fig, ax = plt.subplots()
+        df['probabilite_fraude'].hist(ax=ax, bins=20)
+        ax.set_title("Distribution des probabilités")
+        fig.savefig("temp_hist.png")
+        pdf.image("temp_hist.png", x=10, y=80, w=180)
+        os.remove("temp_hist.png")
+    
+    output = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    pdf.output(output.name)
+    return output.name
+```
+
+---
+
+## 9. Fichier `data/reference_data.csv` (optionnel)
+
+Vous pouvez générer un petit fichier de données historiques à partir de votre jeu de données nettoyé. Par exemple, exécutez :
+
+```python
+import pandas as pd
+df = pd.read_csv('datafraud_cleaned.csv')
+df_sample = df.sample(500)  # ou tout votre jeu
+df_sample.to_csv('app/data/reference_data.csv', index=False)
+```
+
+---
+
+## Organisation finale et lancement
+
+1. Créez tous ces fichiers dans les dossiers correspondants.
+2. Placez votre `fraud_model.pkl` dans `models/`.
+3. À la racine (dans le dossier `app/`), exécutez :
+
+```bash
+streamlit run app.py
+```
+
+L’application démarrera avec un menu latéral permettant de naviguer entre les quatre pages.
+
+Cette architecture modulaire rend le code facile à maintenir et à faire évoluer. N’hésitez pas à me solliciter pour toute adaptation !
