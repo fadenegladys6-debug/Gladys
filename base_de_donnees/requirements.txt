@@ -9,7 +9,7 @@ seaborn
 plotly
 fpdf2
 xlsxwriter
-joblib==1.4.2
+joblib
 scipy
 pillow==10.4.0
 
