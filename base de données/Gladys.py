@@ -46,7 +46,7 @@ print("=" * 70)
 print("1. CHARGEMENT DES DONNÉES")
 print("=" * 70)
 
-DATA_PATH = "C:/Users/hp/Desktop/base de données/datafraud.xlsx"   # ← adapter si besoin
+DATA_PATH ="base de données/datafraud.xlsx"   # ← adapter si besoin
 df_raw = pd.read_excel(DATA_PATH)
 
 print(f"  Dimensions brutes : {df_raw.shape[0]:,} lignes × {df_raw.shape[1]} colonnes")
