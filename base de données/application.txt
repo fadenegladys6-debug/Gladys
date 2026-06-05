@@ -5,8 +5,11 @@ Très bien ! Nous allons implémenter la structure complète pour obtenir une ap
 Dans votre répertoire de travail (par exemple `C:/Users/hp/Desktop/base de données/`), créez l’arborescence suivante :
 
 ```
-app/
-├── app.py
+Gladys/base de données                 ← racine du dépôt GitHub
+│
+├── requirements.txt          ← ici (à la racine, obligatoire)
+├── packages.txt              ← ici (à la racine, pour XGBoost/SHAP)
+├── app.py                    ← point d'entrée Streamlit
 ├── pages/
 │   ├── 1_Prediction.py
 │   ├── 2_Analyse_lot.py
